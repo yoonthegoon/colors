@@ -1,3 +1,5 @@
+"""This module contains classes for various color spaces and methods to convert between them."""
+
 from abc import ABC
 from math import atan2, cos, degrees, radians, sin, sqrt
 from typing import cast, TypeVar
@@ -6,6 +8,8 @@ from numpy import array
 
 
 class ColorSpace(ABC):
+    """Base class for color spaces."""
+
     def __init__(self, values: tuple[float, float, float]) -> None:
         self.values = values
 
@@ -14,6 +18,8 @@ class ColorSpace(ABC):
 
 
 class XYZ(ColorSpace):
+    """The CIE 1931 XYZ color space."""
+
     @property
     def xyY(self) -> "xyY":  # noqa N801
         return xyY.from_XYZ(self)
@@ -30,11 +36,13 @@ class XYZ(ColorSpace):
     def sRGB(self) -> "sRGB":  # noqa N801
         return sRGB.from_XYZ(self)
 
+    # https://en.wikipedia.org/wiki/CIE_1931_color_space#CIE_xy_chromaticity_diagram_and_the_CIE_xyY_color_space
     @classmethod
     def from_xyY(cls, xyy: "xyY") -> "XYZ":  # noqa N801
         x, y, _Y = xyy.values
         return cls((x * _Y / y, _Y, (1 - x - y) * _Y / y))
 
+    # https://en.wikipedia.org/wiki/CIELAB_color_space#Converting_between_CIELAB_and_CIEXYZ_coordinates
     @classmethod
     def from_CIELab(cls, cielab: "CIELab") -> "XYZ":  # noqa N801
         _L, _a, _b = cielab.values
@@ -43,6 +51,7 @@ class XYZ(ColorSpace):
         _Z = D65.values[2] * cielab.f_inv((_L + 16) / 116 - _b / 200)
         return cls((_X, _Y, _Z))
 
+    # https://en.wikipedia.org/wiki/CIELUV#XYZ_%E2%86%92_CIELUV_and_CIELUV_%E2%86%92_XYZ_conversions
     @classmethod
     def from_CIELuv(cls, cieluv: "CIELuv") -> "XYZ":  # noqa N801
         _L, u, v = cieluv.values
@@ -57,6 +66,7 @@ class XYZ(ColorSpace):
         _Z = _X * a + b
         return cls((_X, _Y, _Z))
 
+    # https://en.wikipedia.org/wiki/SRGB#From_sRGB_to_CIE_XYZ
     @classmethod
     def from_sRGB(cls, srgb: "sRGB") -> "XYZ":  # noqa N801
         _M = array(
@@ -74,10 +84,16 @@ D65 = XYZ((0.95047, 1.0, 1.08883))
 
 
 class xyY(ColorSpace):  # noqa N801
+    """
+    The xyY color space is a chromaticity space that is derived from the XYZ color space.
+    With Y being the luminance from the XYZ color space, x and y are the chromaticity coordinates.
+    """
+
     @property
     def XYZ(self) -> "XYZ":  # noqa N801
         return XYZ.from_xyY(self)
 
+    # https://en.wikipedia.org/wiki/CIE_1931_color_space#CIE_xy_chromaticity_diagram_and_the_CIE_xyY_color_space
     @classmethod
     def from_XYZ(cls, xyz: "XYZ") -> "xyY":  # noqa N801
         _X, _Y, _Z = xyz.values
@@ -89,6 +105,12 @@ UCS = TypeVar("UCS", bound="UniformColorSpace")
 
 
 class UniformColorSpace(ColorSpace):
+    """
+    Base class for uniform color spaces.
+    Uniform color spaces are built such that the same geometrical distance anywhere in the color space reflects the same
+    amount of perceived color difference.
+    """
+
     @property
     def LCh(self) -> "LCh":  # noqa N801
         _L, x, y = self.values
@@ -106,10 +128,17 @@ class UniformColorSpace(ColorSpace):
 
 
 class CIELab(UniformColorSpace):
+    """
+    The CIELAB color space is a color space that is designed to be more perceptually uniform.
+    L* represents the lightness of the color, a* represents the redness or greenness of the color,
+    and b* represents the yellowness or blueness of the color.
+    """
+
     @property
     def XYZ(self):  # noqa N801
         return XYZ.from_CIELab(self)
 
+    # https://en.wikipedia.org/wiki/CIELAB_color_space#Converting_between_CIELAB_and_CIEXYZ_coordinates
     @classmethod
     def from_XYZ(cls, xyz: "XYZ") -> "CIELab":  # noqa N801
         fx, fy, fz = map(cls.f, (xyz.values[i] / D65.values[i] for i in range(3)))
@@ -135,10 +164,17 @@ class CIELab(UniformColorSpace):
 
 
 class CIELuv(UniformColorSpace):
+    """
+    The CIELUV color space is a color space that is designed to be more perceptually uniform.
+    L* represents the lightness of the color, u* represents the redness or greenness of the color,
+    and v* represents the yellowness or blueness of the color.
+    """
+
     @property
     def XYZ(self):  # noqa N801
         return XYZ.from_CIELuv(self)
 
+    # https://en.wikipedia.org/wiki/CIELUV#XYZ_%E2%86%92_CIELUV_and_CIELUV_%E2%86%92_XYZ_conversions
     @classmethod
     def from_XYZ(cls, xyz: "XYZ") -> "CIELuv":  # noqa N801
         if xyz.values[1] > 216 / 24389:
@@ -162,6 +198,10 @@ class CIELuv(UniformColorSpace):
 
 
 class LCh(ColorSpace):
+    """
+    The LCh color space is a cylindrical representation of a uniform color space with a lightness component.
+    """
+
     @property
     def CIELab(self) -> "CIELab":  # noqa N801
         return CIELab.from_LCh(self)
@@ -172,6 +212,10 @@ class LCh(ColorSpace):
 
 
 class sRGB(ColorSpace):  # noqa N801
+    """
+    The sRGB color space is a standard RGB color space that is used for displays and the web.
+    """
+
     @property
     def XYZ(self) -> "XYZ":  # noqa N801
         return XYZ.from_sRGB(self)
@@ -212,6 +256,7 @@ class sRGB(ColorSpace):  # noqa N801
         self.values = tuple(map(compress, self.values))
         return self
 
+    # https://en.wikipedia.org/wiki/SRGB#From_CIE_XYZ_to_sRGB
     @classmethod
     def from_XYZ(cls, xyz: "XYZ") -> "sRGB":  # noqa N801
         _M = array(
@@ -247,6 +292,10 @@ class sRGB(ColorSpace):  # noqa N801
 
 
 class HSV(ColorSpace):
+    """
+    The HSV color space is a cylindrical representation of an RGB color space with a hue component.
+    """
+
     @property
     def sRGB(self) -> "sRGB":  # noqa N801
         return sRGB.from_HSV(self)
